@@ -1,151 +1,59 @@
-generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
-}
-
-datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
-}
-
+// Update the User model to include the new relations:
 model User {
-  id          String         @id @default(cuid())
-  email       String         @unique
-  name        String
-  password    String
-  createdAt   DateTime       @default(now())
-  classes     Class[]
-  assignments Assignment[]
-  sessions    StudySession[]
-  studySets   StudySet[]
-  chatMessages ChatMessage[]
-  quizzes      Quiz[]
-  quizAttempts QuizAttempt[]
-
-  icDistrict        String?
-  icState           String?
-  icUsername        String?
-  icPasswordEnc     String?
-  icLastSync        DateTime?
-  icPortalUrl       String?
-  icWorkingEndpoint String?
+  // ... keep existing fields ...
+  ownedServers      Server[]       @relation("ServerOwner")
+  serverMemberships ServerMember[]
+  messages          Message[]
 }
 
-model Class {
-  id          String       @id @default(cuid())
-  name        String
-  color       String       @default("#6366f1")
-  credits     Float        @default(3)
-  userId      String
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  assignments Assignment[]
-  studySets   StudySet[]
-
-  snapshotScore     Float?
-  snapshotMax       Float?
-  snapshotUpdatedAt DateTime?
-  snapshotSource    String?
-}
-
-model Assignment {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  dueDate     DateTime
-  progress    Int      @default(0)
-  completed   Boolean  @default(false)
-  score       Float?
-  maxScore    Float    @default(100)
-  weight      Float    @default(1)
-  type        String?
-  classId     String?
-  class       Class?   @relation(fields: [classId], references: [id], onDelete: SetNull)
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  aiAnalysis   String?
-  rubricText   String?
-  taskPlan     String?
-  taskProgress String?
-}
-
-model StudySession {
-  id          String   @id @default(cuid())
-  type        String   @default("focus")
-  durationMin Int
-  notes       String?
-  startedAt   DateTime @default(now())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model StudySet {
-  id        String      @id @default(cuid())
-  title     String
-  content   String      @default("")
-  shareId   String      @unique @default(cuid())
-  userId    String
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  cards     Flashcard[]
-  chatMessages ChatMessage[]
-  quizzes      Quiz[]
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-
-  classId  String?
-  class    Class?  @relation(fields: [classId], references: [id], onDelete: SetNull)
-  unitName String?
-
-  lessonPlan     String?
-  lessonProgress String?
-}
-
-model Flashcard {
-  id    String   @id @default(cuid())
-  front String
-  back  String
-  setId String
-  set   StudySet @relation(fields: [setId], references: [id], onDelete: Cascade)
-
-  dueAt          DateTime?
-  interval       Float    @default(0)
-  ease           Float    @default(2.5)
-  reps           Int      @default(0)
-  lapses         Int      @default(0)
-  state          String   @default("new")
-  lastReviewedAt DateTime?
-}
-
-model ChatMessage {
-  id        String    @id @default(cuid())
-  userId    String
-  setId     String?
-  role      String
-  content   String
-  createdAt DateTime  @default(now())
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  set       StudySet? @relation(fields: [setId], references: [id], onDelete: Cascade)
-}
-
-model Quiz {
-  id        String        @id @default(cuid())
-  setId     String
-  userId    String
-  questions String
-  createdAt DateTime      @default(now())
-  set       StudySet      @relation(fields: [setId], references: [id], onDelete: Cascade)
-  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  attempts  QuizAttempt[]
-}
-
-model QuizAttempt {
+// Add these new models:
+model Server {
   id        String   @id @default(cuid())
-  quizId    String
-  userId    String
-  score     Int
-  total     Int
-  answers   String
+  name      String
+  iconUrl   String?
   createdAt DateTime @default(now())
-  quiz      Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  
+  ownerId   String
+  owner     User     @relation("ServerOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  
+  channels  Channel[]
+  members   ServerMember[]
+}
+
+model ServerMember {
+  id        String   @id @default(cuid())
+  role      String   @default("STUDENT") // STUDENT, TA, ADMIN
+  joinedAt  DateTime @default(now())
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  serverId  String
+  server    Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, serverId])
+}
+
+model Channel {
+  id        String   @id @default(cuid())
+  name      String
+  type      String   @default("TEXT") // TEXT, VOICE, WHITEBOARD
+  createdAt DateTime @default(now())
+  
+  serverId  String
+  server    Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  
+  messages  Message[]
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  
+  channelId String
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  
+  userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

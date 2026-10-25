@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Hash, Send, Loader2, Plus, GraduationCap, BookOpen, X, Edit2, Trash2, Reply } from 'lucide-react';
+import { Hash, Send, Loader2, Plus, GraduationCap, BookOpen, X, Edit2, Trash2, Reply, AlertCircle } from 'lucide-react';
 import { api } from '@/lib/api.js';
 import { getSocket } from '@/lib/socket.js';
 import { useApp } from '@/lib/store.jsx';
@@ -18,6 +18,8 @@ export default function ServerView() {
   const [messages, setMessages] = useState([]);
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null); // NEW: Error state
+  
   const [attachment, setAttachment] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
@@ -42,6 +44,7 @@ export default function ServerView() {
       return;
     }
     setLoading(true);
+    setError(null); // Reset error on channel change
     const socket = getSocket();
     socket.emit('channel:join', { channelId });
 
@@ -51,7 +54,11 @@ export default function ServerView() {
         setLoading(false);
         setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
       })
-      .catch(console.error);
+      .catch((err) => {
+        console.error(err);
+        setError(err.message || 'Failed to load messages.');
+        setLoading(false); // THIS fixes the infinite spinner
+      });
 
     const onMessage = (msg) => {
       setMessages((prev) => {
@@ -125,6 +132,12 @@ export default function ServerView() {
           {loading ? (
             <div className="flex h-full items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : error ? (
+            <div className="flex h-full flex-col items-center justify-center text-destructive">
+              <AlertCircle className="h-10 w-10 mb-2 opacity-50" />
+              <p className="font-semibold">Failed to load messages</p>
+              <p className="text-sm text-muted-foreground mt-1">{error}</p>
             </div>
           ) : messages.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-muted-foreground">

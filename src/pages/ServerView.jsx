@@ -1,10 +1,13 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Hash, Send, Loader2, Plus, GraduationCap, BookOpen, X } from 'lucide-react';
+import { Hash, Send, Loader2, Plus, GraduationCap, BookOpen, X, Edit2, Trash2, Reply } from 'lucide-react';
 import { api } from '@/lib/api.js';
 import { getSocket } from '@/lib/socket.js';
 import { useApp } from '@/lib/store.jsx';
 import AttachmentModal from '@/components/AttachmentModal.jsx';
+import { Input } from '@/components/ui/input.jsx';
+import { Button } from '@/components/ui/button.jsx';
+import { Dialog, DialogContent } from '@/components/ui/dialog.jsx';
 
 export default function ServerView() {
   const { serverId, channelId } = useParams();
@@ -15,8 +18,11 @@ export default function ServerView() {
   const [messages, setMessages] = useState([]);
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
-  const [attachment, setAttachment] = useState(null); // { id, type, title, meta }
+  const [attachment, setAttachment] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  const [editModal, setEditModal] = useState({ open: false, id: null, content: '' });
+  const [deleteModal, setDeleteModal] = useState({ open: false, id: null });
   
   const scrollRef = useRef(null);
 
@@ -55,8 +61,23 @@ export default function ServerView() {
       setTimeout(() => scrollRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     };
 
+    const onMessageUpdated = (msg) => {
+      setMessages((prev) => prev.map(m => m.id === msg.id ? { ...m, content: msg.content, updatedAt: msg.updatedAt } : m));
+    };
+
+    const onMessageDeleted = (id) => {
+      setMessages((prev) => prev.filter(m => m.id !== id));
+    };
+
     socket.on('message:new', onMessage);
-    return () => { socket.off('message:new', onMessage); };
+    socket.on('message:updated', onMessageUpdated);
+    socket.on('message:deleted', onMessageDeleted);
+
+    return () => { 
+      socket.off('message:new', onMessage); 
+      socket.off('message:updated', onMessageUpdated);
+      socket.off('message:deleted', onMessageDeleted);
+    };
   }, [channelId]);
 
   const sendMessage = (e) => {
@@ -76,19 +97,30 @@ export default function ServerView() {
     setAttachment(null);
   };
 
+  const handleEdit = () => {
+    if (!editModal.content.trim()) return;
+    const socket = getSocket();
+    socket.emit('message:edit', { messageId: editModal.id, content: editModal.content });
+    setEditModal({ open: false, id: null, content: '' });
+  };
+
+  const handleDelete = () => {
+    const socket = getSocket();
+    socket.emit('message:delete', { messageId: deleteModal.id });
+    setDeleteModal({ open: false, id: null });
+  };
+
   const activeChannel = server?.channels.find(c => c.id === channelId);
   if (!server) return null;
 
   return (
     <div className="flex h-full bg-background relative">
       <div className="flex flex-1 flex-col min-w-0 border-r border-border/50">
-        {/* Header */}
         <div className="flex h-[60px] shrink-0 items-center border-b border-border/50 px-4 bg-card/30">
           <Hash className="h-5 w-5 text-muted-foreground mr-2" />
           <h2 className="text-base font-bold">{activeChannel?.name || 'Select a channel'}</h2>
         </div>
 
-        {/* Chat Feed */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {loading ? (
             <div className="flex h-full items-center justify-center">
@@ -100,57 +132,68 @@ export default function ServerView() {
               <p>Welcome to #{activeChannel?.name}!</p>
             </div>
           ) : (
-            messages.map((msg) => (
-              <div key={msg.id} className="flex gap-3 group hover:bg-accent/30 p-2 -mx-2 rounded-md transition-colors">
-                <div className="h-10 w-10 shrink-0 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-                  {msg.user?.name?.charAt(0) || '?'}
-                </div>
-                <div className="flex flex-col min-w-0 flex-1">
-                  <div className="flex items-baseline gap-2">
-                    <span className="font-semibold text-sm hover:underline cursor-pointer">{msg.user?.name || 'User'}</span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+            messages.map((msg) => {
+              const isMine = msg.userId === user.id;
+              return (
+                <div key={msg.id} className="flex gap-3 group relative hover:bg-accent/30 p-2 -mx-2 rounded-md transition-colors">
+                  <div className="h-10 w-10 shrink-0 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
+                    {msg.user?.name?.charAt(0) || '?'}
                   </div>
-                  
-                  {msg.content && <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words">{msg.content}</p>}
-
-                  {/* Rich Embeds */}
-                  {msg.attachmentType === 'ASSIGNMENT' && msg.attachment && (
-                    <div className="mt-2 rounded-lg border-l-4 border-l-primary bg-card border border-border/50 p-3 max-w-sm shadow-sm">
-                      <div className="flex items-center gap-2 text-xs font-bold text-primary mb-1">
-                        <GraduationCap className="h-3.5 w-3.5" /> SHARED ASSIGNMENT
-                      </div>
-                      <p className="font-semibold text-sm">{msg.attachment.title}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Due: {new Date(msg.attachment.dueDate).toLocaleDateString()}
-                      </p>
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-semibold text-sm hover:underline cursor-pointer">{msg.user?.name || 'User'}</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      {msg.updatedAt && msg.updatedAt !== msg.createdAt && (
+                        <span className="text-[10px] text-muted-foreground">(edited)</span>
+                      )}
                     </div>
-                  )}
+                    
+                    {msg.content && <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words">{msg.content}</p>}
 
-                  {msg.attachmentType === 'STUDYSET' && msg.attachment && (
-                    <div className="mt-2 rounded-lg border-l-4 border-l-emerald-500 bg-card border border-border/50 p-3 max-w-sm shadow-sm">
-                      <div className="flex items-center gap-2 text-xs font-bold text-emerald-500 mb-1">
-                        <BookOpen className="h-3.5 w-3.5" /> SHARED STUDY SET
+                    {msg.attachmentType === 'ASSIGNMENT' && msg.attachment && (
+                      <div className="mt-2 rounded-lg border-l-4 border-l-primary bg-card border border-border/50 p-3 max-w-sm shadow-sm">
+                        <div className="flex items-center gap-2 text-xs font-bold text-primary mb-1">
+                          <GraduationCap className="h-3.5 w-3.5" /> SHARED ASSIGNMENT
+                        </div>
+                        <p className="font-semibold text-sm">{msg.attachment.title}</p>
                       </div>
-                      <p className="font-semibold text-sm">{msg.attachment.title}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {msg.attachment._count?.cards || 0} Flashcards
-                      </p>
-                    </div>
-                  )}
+                    )}
 
+                    {msg.attachmentType === 'STUDYSET' && msg.attachment && (
+                      <div className="mt-2 rounded-lg border-l-4 border-l-emerald-500 bg-card border border-border/50 p-3 max-w-sm shadow-sm">
+                        <div className="flex items-center gap-2 text-xs font-bold text-emerald-500 mb-1">
+                          <BookOpen className="h-3.5 w-3.5" /> SHARED STUDY SET
+                        </div>
+                        <p className="font-semibold text-sm">{msg.attachment.title}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="absolute right-4 top-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 bg-card border border-border/50 rounded-md shadow-sm">
+                    <button onClick={() => { setContent(`@${msg.user.name} `); }} className="p-1.5 hover:bg-accent text-muted-foreground rounded-l-md" title="Reply">
+                      <Reply className="h-3.5 w-3.5" />
+                    </button>
+                    {isMine && (
+                      <>
+                        <button onClick={() => setEditModal({ open: true, id: msg.id, content: msg.content })} className="p-1.5 hover:bg-accent text-muted-foreground" title="Edit">
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </button>
+                        <button onClick={() => setDeleteModal({ open: true, id: msg.id })} className="p-1.5 hover:bg-accent hover:text-destructive rounded-r-md" title="Delete">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
           <div ref={scrollRef} className="h-4" />
         </div>
 
-        {/* Input Area */}
         <div className="p-4 shrink-0">
-          
-          {/* Attachment Preview */}
           {attachment && (
             <div className="mb-2 flex items-center justify-between bg-card border border-border/50 p-2 rounded-lg text-sm">
               <div className="flex items-center gap-2 min-w-0">
@@ -180,7 +223,6 @@ export default function ServerView() {
         </div>
       </div>
 
-      {/* Member List (Right) */}
       <div className="hidden lg:flex w-60 shrink-0 flex-col bg-card/30">
         <div className="flex h-[60px] items-center border-b border-border/50 px-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
           Members — {server.members?.length || 0}
@@ -211,6 +253,29 @@ export default function ServerView() {
           setIsModalOpen(false);
         }}
       />
+
+      <Dialog open={editModal.open} onOpenChange={(o) => !o && setEditModal({ open: false, id: null, content: '' })}>
+        <DialogContent title="Edit Message">
+          <Input 
+            value={editModal.content} 
+            onChange={(e) => setEditModal(prev => ({ ...prev, content: e.target.value }))}
+            className="mt-2"
+          />
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="ghost" onClick={() => setEditModal({ open: false, id: null, content: '' })}>Cancel</Button>
+            <Button variant="gradient" onClick={handleEdit}>Save Changes</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteModal.open} onOpenChange={(o) => !o && setDeleteModal({ open: false, id: null })}>
+        <DialogContent title="Delete Message" description="Are you sure you want to delete this message? This cannot be undone.">
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="ghost" onClick={() => setDeleteModal({ open: false, id: null })}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDelete}>Delete</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

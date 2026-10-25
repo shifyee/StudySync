@@ -6,7 +6,7 @@ const THEME_KEY = 'studysync_theme';
 const SIDEBAR_KEY = 'studysync_sidebar';
 
 export function AppProvider({ children }) {
-  const [user, setUser] = useState(null);
+  const [user, setUserState] = useState(null);
   const [loading, setLoading] = useState(!!getToken());
   const [theme, setTheme] = useState(() => {
     try { return JSON.parse(localStorage.getItem(THEME_KEY) || '{}'); } catch { return {}; }
@@ -16,7 +16,6 @@ export function AppProvider({ children }) {
   });
   const [toast, setToastState] = useState(null);
 
-  // Simple toast system — auto-dismisses after 3.5s
   const showToast = useCallback((message, type = 'info') => {
     setToastState({ message, type, id: Date.now() });
     setTimeout(() => setToastState(null), 3500);
@@ -24,13 +23,14 @@ export function AppProvider({ children }) {
 
   useEffect(() => { onOffline(() => showToast('Backend unreachable — showing saved data', 'warn')); }, [showToast]);
 
-  // Restore session on refresh
   useEffect(() => {
     if (!getToken()) return;
-    api('/auth/me').then(setUser).catch(() => setToken(null)).finally(() => setLoading(false));
+    api('/auth/me')
+      .then(setUserState)
+      .catch(() => setToken(null))
+      .finally(() => setLoading(false));
   }, []);
 
-  // Apply theme classes to <html>
   useEffect(() => {
     const dark = theme.dark ?? matchMedia('(prefers-color-scheme: dark)').matches;
     document.documentElement.classList.toggle('dark', dark);
@@ -38,20 +38,19 @@ export function AppProvider({ children }) {
     localStorage.setItem(THEME_KEY, JSON.stringify(theme));
   }, [theme]);
 
-  // Persist sidebar state
   useEffect(() => {
     try { localStorage.setItem(SIDEBAR_KEY, sidebarOpen ? '1' : '0'); } catch {}
   }, [sidebarOpen]);
 
   const login = async (email, password) => {
     const data = await api('/auth/login', { method: 'POST', body: { email, password } });
-    setToken(data.token); setUser(data.user);
+    setToken(data.token); setUserState(data.user);
   };
   const register = async (name, email, password) => {
     const data = await api('/auth/register', { method: 'POST', body: { name, email, password } });
-    setToken(data.token); setUser(data.user);
+    setToken(data.token); setUserState(data.user);
   };
-  const logout = () => { setToken(null); setUser(null); };
+  const logout = () => { setToken(null); setUserState(null); };
 
   const isDark = theme.dark ?? matchMedia('(prefers-color-scheme: dark)').matches;
   const toggleDark = () => setTheme((t) => ({ ...t, dark: !isDark }));
@@ -60,7 +59,7 @@ export function AppProvider({ children }) {
 
   return (
     <Ctx.Provider value={{
-      user, loading, login, register, logout,
+      user, setUser: setUserState, loading, login, register, logout,
       isDark, toggleDark,
       contrast: !!theme.contrast, toggleContrast,
       toast: showToast,

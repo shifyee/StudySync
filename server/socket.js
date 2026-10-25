@@ -1,13 +1,13 @@
 /**
  * Real-time study rooms: chat, shared whiteboard, quick polls.
  * Collaborative note editing: Yjs document sync + awareness relay.
- * Discord-style text channels: message sync.
+ * Discord-style text channels: message sync, edits, deletes.
  */
 import * as Y from 'yjs';
 import { prisma } from './db.js';
 
-const rooms = new Map(); // code -> { users: Map, messages: [], canvas: [], poll: null }
-const yjsRooms = new Map(); // setId -> { doc: Y.Doc, clients: Set<socketId>, seeded: boolean }
+const rooms = new Map(); 
+const yjsRooms = new Map(); 
 const MAX_MESSAGES = 200;
 const MAX_CANVAS_OBJECTS = 2000;
 
@@ -35,8 +35,8 @@ function cleanupYjs(setId) {
 
 export function setupSockets(io) {
   io.on('connection', (socket) => {
-    let current = null; // room code this socket has joined
-    let currentChannel = null; // Discord-style channel ID
+    let current = null; 
+    let currentChannel = null;
 
     /* ---------- Discord-Style Text Channels ---------- */
 
@@ -47,7 +47,7 @@ export function setupSockets(io) {
     });
 
     socket.on('message:send', async ({ channelId, content, userId, attachmentId, attachmentType }) => {
-      if ((!content.trim() && !attachmentId) || !userId || !channelId) return;
+      if ((!content?.trim() && !attachmentId) || !userId || !channelId) return;
       
       try {
         const msg = await prisma.message.create({
@@ -58,16 +58,37 @@ export function setupSockets(io) {
             attachmentId,
             attachmentType
           },
-          include: { 
-            user: { select: { id: true, name: true } }
-            // We will fetch the actual assignment/set details on the frontend or in the history route
-          }
+          include: { user: { select: { id: true, name: true } } }
         });
         io.to(`channel:${channelId}`).emit('message:new', msg);
       } catch (err) {
         console.error('Message send failed', err);
       }
     });
+
+    socket.on('message:edit', async ({ messageId, content }) => {
+      try {
+        const msg = await prisma.message.update({
+          where: { id: messageId },
+          data: { content: clean(content, 2000) }
+        });
+        io.to(`channel:${msg.channelId}`).emit('message:updated', msg);
+      } catch (err) {
+        console.error('Message edit failed', err);
+      }
+    });
+
+    socket.on('message:delete', async ({ messageId }) => {
+      try {
+        const msg = await prisma.message.delete({
+          where: { id: messageId }
+        });
+        io.to(`channel:${msg.channelId}`).emit('message:deleted', messageId);
+      } catch (err) {
+        console.error('Message delete failed', err);
+      }
+    });
+
     socket.on('channel:typing', ({ channelId, userName }) => {
       if (!channelId) return;
       socket.to(`channel:${channelId}`).emit('channel:typing', { userName });
@@ -206,7 +227,7 @@ export function setupSockets(io) {
 
     /* ---------- Disconnect ---------- */
 
-    socket.on('disconnect', () => {z
+    socket.on('disconnect', () => {
       if (current) {
         const room = rooms.get(current);
         if (room) {

@@ -1,9 +1,10 @@
 /**
  * Real-time study rooms: chat, shared whiteboard, quick polls.
  * Collaborative note editing: Yjs document sync + awareness relay.
- * State is held in memory (resets on restart) — simple and dependency-free.
+ * Discord-style text channels: message sync.
  */
 import * as Y from 'yjs';
+import { prisma } from './db.js';
 
 const rooms = new Map(); // code -> { users: Map, messages: [], canvas: [], poll: null }
 const yjsRooms = new Map(); // setId -> { doc: Y.Doc, clients: Set<socketId>, seeded: boolean }
@@ -35,6 +36,34 @@ function cleanupYjs(setId) {
 export function setupSockets(io) {
   io.on('connection', (socket) => {
     let current = null; // room code this socket has joined
+    let currentChannel = null; // Discord-style channel ID
+
+    /* ---------- Discord-Style Text Channels ---------- */
+
+    socket.on('channel:join', ({ channelId }) => {
+      if (currentChannel) socket.leave(`channel:${currentChannel}`);
+      currentChannel = channelId;
+      socket.join(`channel:${channelId}`);
+    });
+
+    socket.on('message:send', async ({ channelId, content, userId }) => {
+      if (!content.trim() || !userId || !channelId) return;
+      
+      try {
+        const msg = await prisma.message.create({
+          data: { channelId, userId, content: clean(content, 2000) },
+          include: { user: { select: { id: true, name: true } } }
+        });
+        io.to(`channel:${channelId}`).emit('message:new', msg);
+      } catch (err) {
+        console.error('Message send failed', err);
+      }
+    });
+
+    socket.on('channel:typing', ({ channelId, userName }) => {
+      if (!channelId) return;
+      socket.to(`channel:${channelId}`).emit('channel:typing', { userName });
+    });
 
     /* ---------- Study rooms (existing) ---------- */
 

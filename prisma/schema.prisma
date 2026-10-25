@@ -203,6 +203,10 @@ model Message {
   content   String
   createdAt DateTime @default(now())
   
+  // NEW: For sharing assignments or study sets
+  attachmentId   String?
+  attachmentType String? // "ASSIGNMENT" or "STUDYSET"
+  
   channelId String
   channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
   

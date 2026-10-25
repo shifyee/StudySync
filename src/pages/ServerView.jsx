@@ -136,9 +136,10 @@ export default function ServerView() {
             placeholder={`Message #${activeChannel?.name || ''}`}
             className="flex-1 bg-transparent border-none outline-none text-sm placeholder:text-muted-foreground h-10"
           />
+          {/* FIXED: Changed </Button> to </button> */}
           <button type="submit" disabled={!content.trim()} className="p-2 text-primary disabled:text-muted-foreground hover:bg-primary/10 rounded-full transition-colors">
             <Send className="h-4 w-4" />
-          </Button>
+          </button>
         </form>
       </div>
     </div>

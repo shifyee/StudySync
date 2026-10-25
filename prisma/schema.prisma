@@ -22,7 +22,7 @@ model User {
   quizzes      Quiz[]
   quizAttempts QuizAttempt[]
 
-  // New Discord-style relations
+  // Discord-style relations
   ownedServers      Server[]       @relation("ServerOwner")
   serverMemberships ServerMember[]
   messages          Message[]
@@ -156,7 +156,7 @@ model QuizAttempt {
 }
 
 // -----------------------------------------------------
-// NEW DISCORD-STYLE MODELS
+// DISCORD-STYLE MODELS
 // -----------------------------------------------------
 
 model Server {
@@ -174,7 +174,7 @@ model Server {
 
 model ServerMember {
   id        String   @id @default(cuid())
-  role      String   @default("STUDENT") // STUDENT, TA, ADMIN
+  role      String   @default("STUDENT")
   joinedAt  DateTime @default(now())
   
   userId    String
@@ -189,7 +189,7 @@ model ServerMember {
 model Channel {
   id        String   @id @default(cuid())
   name      String
-  type      String   @default("TEXT") // TEXT, VOICE, WHITEBOARD
+  type      String   @default("TEXT")
   createdAt DateTime @default(now())
   
   serverId  String
@@ -202,10 +202,10 @@ model Message {
   id        String   @id @default(cuid())
   content   String
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   
-  // NEW: For sharing assignments or study sets
   attachmentId   String?
-  attachmentType String? // "ASSIGNMENT" or "STUDYSET"
+  attachmentType String?
   
   channelId String
   channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)

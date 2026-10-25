@@ -269,11 +269,12 @@ export default function ServerView() {
 
       <Dialog open={editModal.open} onOpenChange={(o) => !o && setEditModal({ open: false, id: null, content: '' })}>
         <DialogContent title="Edit Message">
-          <Input 
-            value={editModal.content} 
-            onChange={(e) => setEditModal(prev => ({ ...prev, content: e.target.value }))}
-            className="mt-2"
-          />
+      <input
+         value={content}
+         onChange={(e) => setContent(e.target.value)}
+         placeholder={`Message #${activeChannel?.name || ''}`}
+         className="flex-1 bg-transparent border-none outline-none focus:ring-0 focus-visible:ring-0 focus:outline-none text-sm placeholder:text-muted-foreground h-10"
+      />
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="ghost" onClick={() => setEditModal({ open: false, id: null, content: '' })}>Cancel</Button>
             <Button variant="gradient" onClick={handleEdit}>Save Changes</Button>

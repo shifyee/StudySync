@@ -7,7 +7,10 @@ import { requireAuth, validate, wrap } from '../middleware/auth.js';
 
 const router = Router();
 const sign = (user) => jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
-const publicUser = (u) => ({ id: u.id, email: u.email, name: u.name });
+const publicUser = (u) => ({ 
+  id: u.id, email: u.email, name: u.name, 
+  displayName: u.displayName, avatarUrl: u.avatarUrl, bio: u.bio 
+});
 
 const registerSchema = z.object({
   name: z.string().trim().min(1).max(60),
@@ -36,6 +39,22 @@ router.get('/me', requireAuth, wrap(async (req, res) => {
   const user = await prisma.user.findUnique({ where: { id: req.user.id } });
   if (!user) return res.status(404).json({ error: 'User not found' });
   res.json(publicUser(user));
+}));
+
+router.put('/profile', requireAuth, validate(z.object({
+  displayName: z.string().max(50).optional(),
+  bio: z.string().max(500).optional(),
+  avatarUrl: z.string().optional()
+})), wrap(async (req, res) => {
+  const updated = await prisma.user.update({
+    where: { id: req.user.id },
+    data: {
+      displayName: req.body.displayName,
+      bio: req.body.bio,
+      avatarUrl: req.body.avatarUrl
+    }
+  });
+  res.json(publicUser(updated));
 }));
 
 export default router;

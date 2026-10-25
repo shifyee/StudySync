@@ -14,6 +14,10 @@ model User {
   name         String
   password     String
   createdAt    DateTime       @default(now())
+  avatarUrl    String?
+  bio          String?
+  displayName  String?
+  
   classes      Class[]
   assignments  Assignment[]
   sessions     StudySession[]
@@ -155,10 +159,6 @@ model QuizAttempt {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// -----------------------------------------------------
-// DISCORD-STYLE MODELS
-// -----------------------------------------------------
-
 model Server {
   id        String   @id @default(cuid())
   name      String
@@ -206,6 +206,9 @@ model Message {
   
   attachmentId   String?
   attachmentType String?
+  fileUrl        String?
+  fileName       String?
+  fileType       String?
   
   channelId String
   channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)

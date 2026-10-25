@@ -18,6 +18,7 @@ import NotesChat from '@/components/NotesChat.jsx';
 import MusicPlayer from '@/components/MusicPlayer.jsx';
 import TimerBadge from '@/components/TimerBadge.jsx';
 import InstallBanner from '@/components/InstallBanner.jsx';
+import CreateServerModal from '@/components/CreateServerModal.jsx';
 
 const BASE_NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -50,6 +51,7 @@ export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [servers, setServers] = useState([]);
   const [activeServer, setActiveServer] = useState(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const gamesUnlocked = useGamesUnlocked();
   
   const location = useLocation();
@@ -59,12 +61,10 @@ export default function Layout() {
   const match = location.pathname.match(/^\/server\/([^/]+)/);
   const activeServerId = match ? match[1] : null;
 
-  // Fetch servers
   useEffect(() => {
     api('/servers').then(setServers).catch(console.error);
   }, []);
 
-  // Fetch active server details (channels) when ID changes
   useEffect(() => {
     if (activeServerId) {
       api(`/servers/${activeServerId}`).then(setActiveServer).catch(console.error);
@@ -77,7 +77,6 @@ export default function Layout() {
 
   const ServerRail = () => (
     <div className="w-[72px] shrink-0 bg-black/40 flex flex-col items-center py-3 gap-2 overflow-y-auto custom-scrollbar border-r border-border/20 z-20">
-      {/* Home Button */}
       <NavLink
         to="/"
         className={({ isActive }) => cn(
@@ -91,7 +90,6 @@ export default function Layout() {
 
       <div className="w-8 h-[2px] bg-white/10 rounded-full my-1" />
 
-      {/* Server Icons */}
       {servers.map((server) => (
         <button
           key={server.id}
@@ -108,17 +106,8 @@ export default function Layout() {
         </button>
       ))}
 
-      {/* Add Server Button */}
       <button 
-        onClick={() => {
-          const name = prompt("Enter a name for your new Study Group/Class:");
-          if (name) {
-            api('/servers', { method: 'POST', body: { name } }).then(newServer => {
-              setServers([...servers, newServer]);
-              navigate(`/server/${newServer.id}`);
-            });
-          }
-        }}
+        onClick={() => setIsCreateOpen(true)}
         className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 text-green-500 hover:bg-green-500 hover:text-white transition-all"
         title="Create a Server"
       >
@@ -152,7 +141,6 @@ export default function Layout() {
 
       <nav className={cn('flex-1 overflow-y-auto p-2 space-y-0.5', compact && 'px-1 mt-2')}>
         {isHome ? (
-          /* Global Navigation */
           NAV.map(({ to, label, icon: Icon }) => (
             <NavLink key={to} to={to} end={to === '/'} onClick={onNavigate} 
               className={({ isActive }) => cn(
@@ -167,7 +155,6 @@ export default function Layout() {
             </NavLink>
           ))
         ) : (
-          /* Server Channels */
           <>
             <div className="px-2 pb-1 pt-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Text Channels</div>
             {activeServer?.channels.filter(c => c.type === 'TEXT').map(channel => (
@@ -223,16 +210,13 @@ export default function Layout() {
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <a href="#main" className="sr-only">Skip to content</a>
-
-      {/* 1. Server Rail (Far Left) */}
+      
       <ServerRail />
 
-      {/* 2. Channel Sidebar (Middle Left) */}
       <aside className={cn('hidden md:flex flex-col border-r border-border/50 bg-card/60 backdrop-blur-xl transition-[width] duration-200 z-10', sidebarOpen ? 'w-60' : 'w-16')}>
         <ChannelSidebar compact={!sidebarOpen} />
       </aside>
 
-      {/* Mobile Drawer */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
@@ -247,7 +231,6 @@ export default function Layout() {
         </div>
       )}
 
-      {/* 3. Main Content Area */}
       <div className="flex flex-1 flex-col overflow-hidden relative">
         <header className="flex items-center gap-2 border-b border-border/50 px-3 py-2 md:hidden bg-card/60 backdrop-blur-xl">
           <Button variant="ghost" size="icon" onClick={() => setMobileOpen(true)}>
@@ -267,6 +250,15 @@ export default function Layout() {
       <Tour />
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <NotesChat />
+      
+      <CreateServerModal 
+        open={isCreateOpen} 
+        onClose={() => setIsCreateOpen(false)} 
+        onCreated={(newServer) => {
+          setServers(prev => [...prev, newServer]);
+          navigate(`/server/${newServer.id}`);
+        }}
+      />
     </div>
   );
 }

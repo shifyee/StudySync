@@ -16,8 +16,8 @@ import quizzesRoutes from './routes/quizzes.js';
 import shareEditRoutes from './routes/shareEdit.js';
 import infiniteCampusRoutes from './routes/infinitecampus.js';
 import activityRoutes from './routes/activity.js';
+import serverRoutes from './routes/servers.js'; // NEW
 import { setupSockets } from './socket.js';
-import serverRoutes from './routes/servers.js';
 
 if (!process.env.JWT_SECRET) {
   console.error('❌ JWT_SECRET is missing. Copy .env.example to .env and set it.');
@@ -50,7 +50,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/quizzes', quizzesRoutes);
 app.use('/api/ic', infiniteCampusRoutes);
 app.use('/api/activity', activityRoutes);
-app.use('/api/servers', serverRoutes);
+app.use('/api/servers', serverRoutes); // NEW
 
 // Serve music and games from the public folder
 app.use('/api/music', express.static(path.join(__dirname, '..', 'public', 'music'), { maxAge: '7d', immutable: true }));

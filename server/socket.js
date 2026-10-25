@@ -46,20 +46,28 @@ export function setupSockets(io) {
       socket.join(`channel:${channelId}`);
     });
 
-    socket.on('message:send', async ({ channelId, content, userId }) => {
-      if (!content.trim() || !userId || !channelId) return;
+    socket.on('message:send', async ({ channelId, content, userId, attachmentId, attachmentType }) => {
+      if ((!content.trim() && !attachmentId) || !userId || !channelId) return;
       
       try {
         const msg = await prisma.message.create({
-          data: { channelId, userId, content: clean(content, 2000) },
-          include: { user: { select: { id: true, name: true } } }
+          data: { 
+            channelId, 
+            userId, 
+            content: clean(content, 2000),
+            attachmentId,
+            attachmentType
+          },
+          include: { 
+            user: { select: { id: true, name: true } }
+            // We will fetch the actual assignment/set details on the frontend or in the history route
+          }
         });
         io.to(`channel:${channelId}`).emit('message:new', msg);
       } catch (err) {
         console.error('Message send failed', err);
       }
     });
-
     socket.on('channel:typing', ({ channelId, userName }) => {
       if (!channelId) return;
       socket.to(`channel:${channelId}`).emit('channel:typing', { userName });
@@ -198,7 +206,7 @@ export function setupSockets(io) {
 
     /* ---------- Disconnect ---------- */
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', () => {z
       if (current) {
         const room = rooms.get(current);
         if (room) {

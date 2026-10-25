@@ -85,11 +85,25 @@ router.post('/:serverId/channels', validate(z.object({
 router.get('/channels/:channelId/messages', wrap(async (req, res) => {
   const messages = await prisma.message.findMany({
     where: { channelId: req.params.channelId },
-    include: { user: { select: { id: true, name: true } } },
+    include: { 
+      user: { select: { id: true, name: true } }
+    },
     orderBy: { createdAt: 'desc' },
     take: 50
   });
-  res.json(messages.reverse());
+
+  // Hydrate attachments
+  const hydratedMessages = await Promise.all(messages.map(async (msg) => {
+    let attachment = null;
+    if (msg.attachmentType === 'ASSIGNMENT' && msg.attachmentId) {
+      attachment = await prisma.assignment.findUnique({ where: { id: msg.attachmentId }, select: { id: true, title: true, dueDate: true, completed: true } });
+    } else if (msg.attachmentType === 'STUDYSET' && msg.attachmentId) {
+      attachment = await prisma.studySet.findUnique({ where: { id: msg.attachmentId }, select: { id: true, title: true, _count: { select: { cards: true } } } });
+    }
+    return { ...msg, attachment };
+  }));
+
+  res.json(hydratedMessages.reverse());
 }));
 
 export default router;

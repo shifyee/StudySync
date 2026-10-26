@@ -1,8 +1,3 @@
-/**
- * Real-time study rooms: chat, shared whiteboard, quick polls.
- * Collaborative note editing: Yjs document sync + awareness relay.
- * Discord-style text channels: message sync, edits, deletes.
- */
 import * as Y from 'yjs';
 import { prisma } from './db.js';
 
@@ -46,8 +41,8 @@ export function setupSockets(io) {
       socket.join(`channel:${channelId}`);
     });
 
-    socket.on('message:send', async ({ channelId, content, userId, attachmentId, attachmentType }) => {
-      if ((!content?.trim() && !attachmentId) || !userId || !channelId) return;
+    socket.on('message:send', async ({ channelId, content, userId, attachmentId, attachmentType, fileUrl, fileName, fileType }) => {
+      if ((!content?.trim() && !attachmentId && !fileUrl) || !userId || !channelId) return;
       
       try {
         const msg = await prisma.message.create({
@@ -56,11 +51,23 @@ export function setupSockets(io) {
             userId, 
             content: clean(content, 2000),
             attachmentId,
-            attachmentType
+            attachmentType,
+            fileUrl,
+            fileName,
+            fileType
           },
-          include: { user: { select: { id: true, name: true } } }
+          include: { user: { select: { id: true, name: true, avatarUrl: true, displayName: true } } }
         });
-        io.to(`channel:${channelId}`).emit('message:new', msg);
+
+        // Hydrate attachment before sending
+        let attachment = null;
+        if (attachmentType === 'ASSIGNMENT' && attachmentId) {
+          attachment = await prisma.assignment.findUnique({ where: { id: attachmentId }, select: { id: true, title: true, dueDate: true } });
+        } else if (attachmentType === 'STUDYSET' && attachmentId) {
+          attachment = await prisma.studySet.findUnique({ where: { id: attachmentId }, select: { id: true, title: true, _count: { select: { cards: true } } } });
+        }
+
+        io.to(`channel:${channelId}`).emit('message:new', { ...msg, attachment });
       } catch (err) {
         console.error('Message send failed', err);
       }
@@ -94,7 +101,7 @@ export function setupSockets(io) {
       socket.to(`channel:${channelId}`).emit('channel:typing', { userName });
     });
 
-    /* ---------- Study rooms (existing) ---------- */
+    /* ---------- Study rooms ---------- */
 
     socket.on('room:join', ({ code, name }) => {
       code = clean(code, 12).toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -165,7 +172,7 @@ export function setupSockets(io) {
       io.to(current).emit('poll:update', null);
     });
 
-    /* ---------- Collaborative note editing (Yjs relay) ---------- */
+    /* ---------- Collaborative note editing ---------- */
 
     socket.on('notes:yjs-join', ({ setId }) => {
       setId = clean(setId, 40);

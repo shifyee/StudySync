@@ -26,7 +26,6 @@ model User {
   quizzes      Quiz[]
   quizAttempts QuizAttempt[]
 
-  // Discord-style relations
   ownedServers      Server[]       @relation("ServerOwner")
   serverMemberships ServerMember[]
   messages          Message[]
@@ -190,7 +189,7 @@ model Channel {
   id        String   @id @default(cuid())
   name      String
   type      String   @default("TEXT")
-  position  Int      @default(0) // NEW
+  position  Int      @default(0)
   createdAt DateTime @default(now())
   
   serverId  String

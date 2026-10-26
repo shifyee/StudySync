@@ -19,6 +19,7 @@ import MusicPlayer from '@/components/MusicPlayer.jsx';
 import TimerBadge from '@/components/TimerBadge.jsx';
 import InstallBanner from '@/components/InstallBanner.jsx';
 import CreateServerModal from '@/components/CreateServerModal.jsx';
+import ServerSettingsModal from '@/components/ServerSettingsModal.jsx';
 
 const BASE_NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -52,6 +53,7 @@ export default function Layout() {
   const [servers, setServers] = useState([]);
   const [activeServer, setActiveServer] = useState(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isServerSettingsOpen, setIsServerSettingsOpen] = useState(false);
   const [activeVoiceChannel, setActiveVoiceChannel] = useState(null);
   const gamesUnlocked = useGamesUnlocked();
   
@@ -85,7 +87,6 @@ export default function Layout() {
           "group relative flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-200",
           isHome ? "bg-primary text-primary-foreground rounded-xl shadow-md" : "bg-white/5 text-white/70 hover:bg-primary hover:text-white"
         )}
-        title="Home"
       >
         <Home className="h-6 w-6" />
       </NavLink>
@@ -111,7 +112,6 @@ export default function Layout() {
       <button 
         onClick={() => setIsCreateOpen(true)}
         className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 text-green-500 hover:bg-green-500 hover:text-white transition-all"
-        title="Create a Server"
       >
         <Plus className="h-6 w-6" />
       </button>
@@ -124,9 +124,16 @@ export default function Layout() {
         {isHome ? (
           <NavLink to="/" onClick={onNavigate}><Logo size={compact ? 'sm' : 'md'} compact={compact} /></NavLink>
         ) : (
-          <div className="font-semibold truncate flex-1">{activeServer?.name || 'Server'}</div>
+          <div className="font-semibold truncate flex-1 flex items-center justify-between">
+            <span className="truncate">{activeServer?.name || 'Server'}</span>
+            {!compact && (
+              <button onClick={() => setIsServerSettingsOpen(true)} className="text-muted-foreground hover:text-foreground">
+                <Settings className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         )}
-        {!compact && (
+        {!compact && isHome && (
           <Button variant="ghost" size="icon" onClick={toggleSidebar} className="hidden md:inline-flex text-muted-foreground">
             <PanelLeftClose className="h-4 w-4" />
           </Button>
@@ -194,10 +201,10 @@ export default function Layout() {
                   {isJoined && !compact && (
                     <div className="ml-6 pl-2 border-l-2 border-green-500/30 flex flex-col gap-1 py-1">
                       <div className="flex items-center gap-2 text-sm text-green-500/80">
-                        <div className="h-5 w-5 rounded-full bg-green-500/20 flex items-center justify-center text-[10px] font-bold">
-                          {user?.name?.charAt(0)}
+                        <div className="h-5 w-5 rounded-full bg-green-500/20 flex items-center justify-center text-[10px] font-bold overflow-hidden">
+                           {user?.avatarUrl ? <img src={user.avatarUrl} className="h-full w-full object-cover" /> : user?.name?.charAt(0)}
                         </div>
-                        {user?.name}
+                        {user?.displayName || user?.name}
                       </div>
                     </div>
                   )}
@@ -225,12 +232,12 @@ export default function Layout() {
       <div className={cn('border-t border-border/50 p-2 bg-card', compact && 'flex flex-col items-center')}>
         <div className={cn('flex items-center gap-1.5', compact ? 'flex-col' : 'justify-between px-1')}>
           <div className="flex items-center gap-2 min-w-0">
-            <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold shrink-0">
-              {user?.name?.charAt(0) || '?'}
+            <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold shrink-0 overflow-hidden">
+              {user?.avatarUrl ? <img src={user.avatarUrl} className="h-full w-full object-cover" /> : user?.name?.charAt(0) || '?'}
             </div>
             {!compact && (
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold leading-tight">{user?.name || 'Student'}</p>
+                <p className="truncate text-sm font-semibold leading-tight">{user?.displayName || user?.name || 'Student'}</p>
               </div>
             )}
           </div>
@@ -271,6 +278,12 @@ export default function Layout() {
           setServers(prev => [...prev, newServer]);
           navigate(`/server/${newServer.id}`);
         }}
+      />
+      <ServerSettingsModal 
+        open={isServerSettingsOpen} 
+        onClose={() => setIsServerSettingsOpen(false)} 
+        server={activeServer}
+        onRefresh={() => api(`/servers/${activeServerId}`).then(setActiveServer)}
       />
     </div>
   );

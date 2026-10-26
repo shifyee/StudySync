@@ -30,9 +30,9 @@ router.post('/', validate(z.object({ name: z.string().min(2).max(50) })), wrap(a
       members: { create: { userId: req.user.id, role: 'ADMIN' } },
       channels: {
         create: [
-          { name: 'general', type: 'TEXT' },
-          { name: 'homework-help', type: 'TEXT' },
-          { name: 'study-hall', type: 'VOICE' }
+          { name: 'general', type: 'TEXT', position: 0 },
+          { name: 'homework-help', type: 'TEXT', position: 1 },
+          { name: 'study-hall', type: 'VOICE', position: 2 }
         ]
       }
     },
@@ -52,15 +52,15 @@ router.get('/:serverId', wrap(async (req, res) => {
   const server = await prisma.server.findUnique({
     where: { id: req.params.serverId },
     include: {
-      channels: { orderBy: { createdAt: 'asc' } },
-      members: { include: { user: { select: { id: true, name: true, email: true } } } }
+      channels: { orderBy: { position: 'asc' } },
+      members: { include: { user: { select: { id: true, name: true, email: true, avatarUrl: true, displayName: true } } } }
     }
   });
 
   res.json(server);
 }));
 
-// Create a channel in a server
+// Create a channel
 router.post('/:serverId/channels', validate(z.object({ 
   name: z.string().min(1).max(30),
   type: z.enum(['TEXT', 'VOICE', 'WHITEBOARD']).default('TEXT')
@@ -70,15 +70,29 @@ router.post('/:serverId/channels', validate(z.object({
   });
   if (!member || member.role !== 'ADMIN') return res.status(403).json({ error: 'Only admins can create channels' });
 
+  const count = await prisma.channel.count({ where: { serverId: req.params.serverId } });
+
   const channel = await prisma.channel.create({
     data: {
       name: req.body.name.toLowerCase().replace(/\s+/g, '-'),
       type: req.body.type,
-      serverId: req.params.serverId
+      serverId: req.params.serverId,
+      position: count
     }
   });
 
   res.status(201).json(channel);
+}));
+
+// Delete a channel
+router.delete('/:serverId/channels/:channelId', wrap(async (req, res) => {
+  const member = await prisma.serverMember.findUnique({
+    where: { userId_serverId: { userId: req.user.id, serverId: req.params.serverId } }
+  });
+  if (!member || member.role !== 'ADMIN') return res.status(403).json({ error: 'Only admins can delete channels' });
+
+  await prisma.channel.delete({ where: { id: req.params.channelId } });
+  res.status(204).end();
 }));
 
 // Get message history for a channel
@@ -86,7 +100,7 @@ router.get('/channels/:channelId/messages', wrap(async (req, res) => {
   const messages = await prisma.message.findMany({
     where: { channelId: req.params.channelId },
     include: { 
-      user: { select: { id: true, name: true } }
+      user: { select: { id: true, name: true, avatarUrl: true, displayName: true } }
     },
     orderBy: { createdAt: 'desc' },
     take: 50

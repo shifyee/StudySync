@@ -190,6 +190,7 @@ model Channel {
   id        String   @id @default(cuid())
   name      String
   type      String   @default("TEXT")
+  position  Int      @default(0) // NEW
   createdAt DateTime @default(now())
   
   serverId  String

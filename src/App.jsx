@@ -20,7 +20,6 @@ const Quiz = lazy(() => import('./pages/Quiz.jsx'));
 const AssignmentWorkspace = lazy(() => import('./pages/AssignmentWorkspace.jsx'));
 const Learn = lazy(() => import('./pages/Learn.jsx'));
 const Games = lazy(() => import('./pages/Games.jsx'));
-const ServerView = lazy(() => import('./pages/ServerView.jsx')); // NEW
 
 const Spinner = () => (
   <div className="flex h-screen items-center justify-center">
@@ -55,9 +54,6 @@ export default function App() {
               <Route path="assignment/:id" element={<AssignmentWorkspace />} />
               <Route path="learn/:id" element={<Learn />} />
               <Route path="study" element={<GamesGuard><Games /></GamesGuard>} />
-              
-              {/* NEW SERVER ROUTE */}
-              <Route path="server/:serverId/:channelId?" element={<ServerView />} />
             </Route>
           </Routes>
         </Suspense>

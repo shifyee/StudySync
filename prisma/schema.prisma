@@ -14,10 +14,6 @@ model User {
   name         String
   password     String
   createdAt    DateTime       @default(now())
-  avatarUrl    String?
-  bio          String?
-  displayName  String?
-  
   classes      Class[]
   assignments  Assignment[]
   sessions     StudySession[]
@@ -25,10 +21,6 @@ model User {
   chatMessages ChatMessage[]
   quizzes      Quiz[]
   quizAttempts QuizAttempt[]
-
-  ownedServers      Server[]       @relation("ServerOwner")
-  serverMemberships ServerMember[]
-  messages          Message[]
 
   icDistrict        String?
   icState           String?
@@ -155,64 +147,5 @@ model QuizAttempt {
   answers   String
   createdAt DateTime @default(now())
   quiz      Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model Server {
-  id        String   @id @default(cuid())
-  name      String
-  iconUrl   String?
-  createdAt DateTime @default(now())
-  
-  ownerId   String
-  owner     User     @relation("ServerOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  
-  channels  Channel[]
-  members   ServerMember[]
-}
-
-model ServerMember {
-  id        String   @id @default(cuid())
-  role      String   @default("STUDENT")
-  joinedAt  DateTime @default(now())
-  
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  serverId  String
-  server    Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, serverId])
-}
-
-model Channel {
-  id        String   @id @default(cuid())
-  name      String
-  type      String   @default("TEXT")
-  position  Int      @default(0)
-  createdAt DateTime @default(now())
-  
-  serverId  String
-  server    Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
-  
-  messages  Message[]
-}
-
-model Message {
-  id        String   @id @default(cuid())
-  content   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  attachmentId   String?
-  attachmentType String?
-  fileUrl        String?
-  fileName       String?
-  fileType       String?
-  
-  channelId String
-  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  
-  userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

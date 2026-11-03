@@ -1,28 +1,34 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { BookOpen, Download, Loader2, ArrowLeft, Layers, AlertCircle } from 'lucide-react';
+import { BookOpen, Download, Loader2, ArrowLeft, Layers, AlertCircle, Edit3, Save } from 'lucide-react';
 import { api } from '@/lib/api.js';
 import { useApp } from '@/lib/store.jsx';
 import { Button } from '@/components/ui/button.jsx';
 import { Card, CardContent } from '@/components/ui/card.jsx';
 import Logo from '@/components/Logo.jsx';
+import CollabEditor from '@/components/CollabEditor.jsx';
 
 export default function SharedSet() {
   const { token } = useParams();
   const navigate = useNavigate();
   const { user, toast } = useApp();
   
-  const [set, setSet] = useState(null);
+  const [setData, setSetData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+  
+  // Edit Together State
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState('');
 
   useEffect(() => {
     if (!token) return;
     setLoading(true);
     api(`/share/${token}`)
       .then((data) => {
-        setSet(data);
+        setSetData(data);
+        setEditedContent(data.content || '');
         setError(null);
       })
       .catch((err) => {
@@ -33,7 +39,7 @@ export default function SharedSet() {
       });
   }, [token]);
 
-  const handleSave = async () => {
+  const handleSaveToLibrary = async () => {
     if (!user) {
       toast('Please log in to save this set.', 'warn');
       navigate('/login');
@@ -50,6 +56,23 @@ export default function SharedSet() {
         toast(res.message || 'Already in your library', 'info');
         navigate(`/notes/${res.set.id}`);
       }
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveEdits = async () => {
+    setSaving(true);
+    try {
+      await api(`/share/${token}/content`, { 
+        method: 'PUT', 
+        body: { content: editedContent } 
+      });
+      setSetData(prev => ({ ...prev, content: editedContent }));
+      setIsEditing(false);
+      toast('Changes saved successfully', 'success');
     } catch (err) {
       toast(err.message, 'error');
     } finally {
@@ -99,9 +122,16 @@ export default function SharedSet() {
           </Link>
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground hidden sm:block">
-              Shared by {set.author}
+              Shared by {setData.author}
             </span>
-            <Button variant="gradient" onClick={handleSave} disabled={saving}>
+            <Button 
+              variant={isEditing ? "outline" : "secondary"} 
+              onClick={() => setIsEditing(!isEditing)}
+            >
+              <Edit3 className="h-4 w-4 mr-2" />
+              {isEditing ? 'Cancel Editing' : 'Edit together'}
+            </Button>
+            <Button variant="gradient" onClick={handleSaveToLibrary} disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
               Save to my sets
             </Button>
@@ -114,32 +144,46 @@ export default function SharedSet() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight mb-2 flex items-center gap-3">
             <BookOpen className="h-8 w-8 text-primary" />
-            {set.title}
+            {setData.title}
           </h1>
           <p className="text-muted-foreground flex items-center gap-2">
             <Layers className="h-4 w-4" />
-            {set.cards?.length || 0} flashcards
+            {setData.cards?.length || 0} flashcards
           </p>
         </div>
 
         {/* Notes Content */}
-        {set.content && (
-          <Card>
-            <CardContent className="p-6">
+        <Card>
+          <CardContent className="p-6">
+            {isEditing ? (
+              <div className="space-y-4">
+                <CollabEditor 
+                  setId={setData.id} 
+                  initialContent={setData.content} 
+                  onContentChange={setEditedContent} 
+                />
+                <div className="flex justify-end pt-2">
+                  <Button variant="gradient" onClick={handleSaveEdits} disabled={saving}>
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                    Save Changes
+                  </Button>
+                </div>
+              </div>
+            ) : (
               <div 
                 className="prose-editor max-w-none text-sm text-foreground/90"
-                dangerouslySetInnerHTML={{ __html: set.content }} 
+                dangerouslySetInnerHTML={{ __html: setData.content }} 
               />
-            </CardContent>
-          </Card>
-        )}
+            )}
+          </CardContent>
+        </Card>
 
         {/* Flashcards */}
-        {set.cards?.length > 0 && (
+        {setData.cards?.length > 0 && (
           <div className="space-y-4">
             <h2 className="text-xl font-semibold">Flashcards</h2>
             <div className="grid gap-3 sm:grid-cols-2">
-              {set.cards.map((card, i) => (
+              {setData.cards.map((card, i) => (
                 <Card key={i} className="bg-card">
                   <CardContent className="p-4 flex flex-col gap-3 h-full justify-between">
                     <div>

@@ -40,13 +40,17 @@ export default function App() {
         <Suspense fallback={<Spinner />}>
           <Routes>
             <Route path="/login" element={<Login />} />
+            
+            {/* Public Share Routes (handles both singular and plural) */}
+            <Route path="/share/:token" element={<SharedSet />} />
+            <Route path="/shared/:token" element={<SharedSet />} />
+
             <Route path="/" element={<Protected><Layout /></Protected>}>
               <Route index element={<Dashboard />} />
               <Route path="calendar" element={<CalendarPage />} />
               <Route path="focus" element={<Focus />} />
               <Route path="notes" element={<Notes />} />
               <Route path="notes/:id" element={<StudySet />} />
-              <Route path="shared/:token" element={<SharedSet />} />
               <Route path="grades" element={<Grades />} />
               <Route path="rooms" element={<Rooms />} />
               <Route path="rooms/:code" element={<Room />} />
@@ -55,6 +59,9 @@ export default function App() {
               <Route path="learn/:id" element={<Learn />} />
               <Route path="study" element={<GamesGuard><Games /></GamesGuard>} />
             </Route>
+
+            {/* Fallback to prevent black screens on bad links */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
       </TimerProvider>

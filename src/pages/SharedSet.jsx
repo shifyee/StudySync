@@ -1,246 +1,162 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Sparkles, Play, Pencil, X, Save, Check, Loader2 } from 'lucide-react';
-import { api, saveSharedSet } from '@/lib/api.js';
+import { BookOpen, Download, Loader2, ArrowLeft, Layers, AlertCircle } from 'lucide-react';
+import { api } from '@/lib/api.js';
 import { useApp } from '@/lib/store.jsx';
 import { Button } from '@/components/ui/button.jsx';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card.jsx';
-import { Dialog, DialogContent } from '@/components/ui/dialog.jsx';
-import { Input } from '@/components/ui/input.jsx';
-import CollabEditor from '@/components/CollabEditor.jsx';
-import { StudyMode } from './StudySet.jsx';
+import { Card, CardContent } from '@/components/ui/card.jsx';
+import Logo from '@/components/Logo.jsx';
 
 export default function SharedSet() {
-  const { shareId } = useParams();
+  const { token } = useParams();
   const navigate = useNavigate();
   const { user, toast } = useApp();
-
+  
   const [set, setSet] = useState(null);
-  const [error, setError] = useState('');
-  const [study, setStudy] = useState(false);
-  const [editorUser, setEditorUser] = useState(null);
-  const [namePromptOpen, setNamePromptOpen] = useState(false);
-  const [nameInput, setNameInput] = useState('');
-  const [saving, setSaving] = useState('');
-
-  const [saveOpen, setSaveOpen] = useState(false);
-  const [saveTitle, setSaveTitle] = useState('');
-  const [saveBusy, setSaveBusy] = useState(false);
-  const [savedSetId, setSavedSetId] = useState(null);
-
-  const saveTimer = useRef(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    api(`/share/${shareId}`).then(setSet).catch((e) => setError(e.message));
-  }, [shareId]);
+    if (!token) return;
+    setLoading(true);
+    api(`/share/${token}`)
+      .then((data) => {
+        setSet(data);
+        setError(null);
+      })
+      .catch((err) => {
+        setError(err.message || 'This shared set does not exist or has expired.');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [token]);
 
-  const handleContentChange = useCallback((html) => {
-    clearTimeout(saveTimer.current);
-    setSaving('Saving…');
-    saveTimer.current = setTimeout(async () => {
-      try {
-        await api(`/share/${shareId}/content`, { method: 'PUT', body: { content: html } });
-        setSaving('Saved');
-      } catch (e) {
-        setSaving('Save failed');
-      }
-    }, 800);
-  }, [shareId]);
-
-  const openSaveDialog = () => {
-    if (!set) return;
-    setSaveTitle(set.title || 'Shared set');
-    setSavedSetId(null);
-    setSaveOpen(true);
-  };
-
-  const confirmSave = async () => {
-    setSaveBusy(true);
+  const handleSave = async () => {
+    if (!user) {
+      toast('Please log in to save this set.', 'warn');
+      navigate('/login');
+      return;
+    }
+    
+    setSaving(true);
     try {
-      const res = await saveSharedSet(shareId, saveTitle.trim() || undefined);
-      if (res.copied) toast(`Saved "${res.set.title}" to your library`);
-      else toast(res.message || 'Already in your library');
-      setSavedSetId(res.set.id);
-    } catch (e) {
-      toast(e.message, 'error');
+      const res = await api(`/share/${token}/save`, { method: 'POST' });
+      if (res.copied) {
+        toast('Set saved to your library!', 'success');
+        navigate(`/notes/${res.set.id}`);
+      } else {
+        toast(res.message || 'Already in your library', 'info');
+        navigate(`/notes/${res.set.id}`);
+      }
+    } catch (err) {
+      toast(err.message, 'error');
     } finally {
-      setSaveBusy(false);
+      setSaving(false);
     }
   };
 
-  const joinAsEditor = () => {
-    const name = nameInput.trim();
-    if (!name) return;
-    const id = `${shareId}-${name.toLowerCase().replace(/\s+/g, '-')}`;
-    setEditorUser({ id, name });
-    setNamePromptOpen(false);
-    setNameInput('');
-  };
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
-  const leaveEditor = () => {
-    if (!confirm('Stop editing? Your changes are already saved.')) return;
-    setEditorUser(null);
-  };
+  if (error) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 text-center">
+        <div className="mb-6 flex items-center gap-2">
+          <Logo size="lg" />
+        </div>
+        <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-8 max-w-md w-full flex flex-col items-center">
+          <AlertCircle className="h-10 w-10 text-destructive mb-4 opacity-80" />
+          <h1 className="text-xl font-bold text-foreground mb-2">Set Not Found</h1>
+          <p className="text-sm text-muted-foreground mb-6">
+            {error}
+          </p>
+          <Link to="/">
+            <Button variant="outline">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to StudySync
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-stone-100 via-stone-50 to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 p-4 md:p-10">
-      <div className="mx-auto max-w-3xl space-y-4 animate-fade-in">
-        <div className="flex items-center justify-between gap-2">
-          <Link to="/" className="inline-flex items-center gap-2 font-bold gradient-text">
-            <Sparkles className="h-5 w-5 text-indigo-500" />StudySync
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-10 border-b border-border/50 bg-background/80 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-4 sm:px-6">
+          <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <Logo size="sm" compact />
+            <span className="font-bold text-lg hidden sm:block">StudySync</span>
           </Link>
-          <div className="flex gap-1.5">
-            {set && (
-              <>
-                {editorUser ? (
-                  <Button variant="outline" size="sm" onClick={leaveEditor}>
-                    <X className="h-4 w-4" />Leave editor
-                  </Button>
-                ) : (
-                  <Button variant="outline" size="sm" onClick={() => setNamePromptOpen(true)}>
-                    <Pencil className="h-4 w-4" />Edit together
-                  </Button>
-                )}
-                <Button variant="gradient" size="sm" onClick={openSaveDialog}>
-                  <Save className="h-4 w-4" />Save to my sets
-                </Button>
-              </>
-            )}
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground hidden sm:block">
+              Shared by {set.author}
+            </span>
+            <Button variant="gradient" onClick={handleSave} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
+              Save to my sets
+            </Button>
           </div>
         </div>
+      </header>
 
-        {error && <Card><CardContent className="p-6 text-destructive">{error}</CardContent></Card>}
+      {/* Content */}
+      <main className="mx-auto max-w-4xl p-4 sm:p-6 lg:p-8 space-y-8">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight mb-2 flex items-center gap-3">
+            <BookOpen className="h-8 w-8 text-primary" />
+            {set.title}
+          </h1>
+          <p className="text-muted-foreground flex items-center gap-2">
+            <Layers className="h-4 w-4" />
+            {set.cards?.length || 0} flashcards
+          </p>
+        </div>
 
-        {set && (
-          <>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-2xl">{set.title}</CardTitle>
-                <CardDescription>
-                  Shared by {set.author} · {set.cards.length} flashcards
-                  {editorUser && <span className="ml-2 text-primary">· editing as {editorUser.name}</span>}
-                  {!editorUser && saving && <span className="ml-2">{saving}</span>}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {editorUser ? (
-                  <CollabEditor
-                    setId={set.id}
-                    initialContent={set.content}
-                    onContentChange={handleContentChange}
-                    extraToolbar={<span aria-live="polite">{saving}</span>}
-                    user={editorUser}
-                  />
-                ) : (
-                  <div className="prose-editor text-sm" dangerouslySetInnerHTML={{ __html: set.content || '<p><i>No notes in this set.</i></p>' }} />
-                )}
-              </CardContent>
-            </Card>
-
-            {set.cards.length > 0 && (
-              <Card>
-                <CardHeader className="flex-row items-center justify-between">
-                  <CardTitle>Flashcards</CardTitle>
-                  <Button variant="gradient" size="sm" onClick={() => setStudy(true)}>
-                    <Play className="h-4 w-4" />Study
-                  </Button>
-                </CardHeader>
-                <CardContent className="grid gap-2 sm:grid-cols-2">
-                  {set.cards.map((c) => (
-                    <div key={c.id} className="rounded-md border bg-card p-3 text-sm">
-                      <p className="font-medium">{c.front}</p>
-                      <p className="text-muted-foreground mt-1">{c.back}</p>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
-
-            {study && <StudyMode cards={set.cards} onClose={() => setStudy(false)} />}
-          </>
+        {/* Notes Content */}
+        {set.content && (
+          <Card>
+            <CardContent className="p-6">
+              <div 
+                className="prose-editor max-w-none text-sm text-foreground/90"
+                dangerouslySetInnerHTML={{ __html: set.content }} 
+              />
+            </CardContent>
+          </Card>
         )}
 
-        <Dialog open={namePromptOpen} onOpenChange={(o) => !o && setNamePromptOpen(false)}>
-          <DialogContent
-            title="Edit together"
-            description="Pick a name so other people editing this set can see who you are."
-          >
-            <div className="space-y-3">
-              <Input
-                autoFocus
-                placeholder="Your name"
-                value={nameInput}
-                onChange={(e) => setNameInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && joinAsEditor()}
-                maxLength={30}
-              />
-              <Button onClick={joinAsEditor} disabled={!nameInput.trim()} variant="gradient" className="w-full">
-                Join editor
-              </Button>
+        {/* Flashcards */}
+        {set.cards?.length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold">Flashcards</h2>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {set.cards.map((card, i) => (
+                <Card key={i} className="bg-card">
+                  <CardContent className="p-4 flex flex-col gap-3 h-full justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-primary uppercase tracking-wider mb-1">Front</p>
+                      <p className="text-sm font-medium">{card.front}</p>
+                    </div>
+                    <div className="border-t border-border/50 pt-3">
+                      <p className="text-xs font-bold text-emerald-500 uppercase tracking-wider mb-1">Back</p>
+                      <p className="text-sm text-muted-foreground">{card.back}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={saveOpen} onOpenChange={(o) => { if (!saveBusy) { setSaveOpen(o); if (!o) setSavedSetId(null); } }}>
-          <DialogContent
-            title={savedSetId ? 'Saved to your sets' : 'Save to my sets'}
-            description={savedSetId
-              ? 'Your copy is ready. It includes the notes and every flashcard.'
-              : 'This creates a copy in your account.'}
-          >
-            {savedSetId ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-emerald-500/15">
-                    <Check className="h-4 w-4 text-emerald-500" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">{saveTitle}</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {set?.cards?.length || 0} flashcard{(set?.cards?.length || 0) === 1 ? '' : 's'} · notes included
-                    </p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="gradient" onClick={() => navigate(`/notes/${savedSetId}`)} className="flex-1">
-                    Open my copy
-                  </Button>
-                  <Button variant="ghost" onClick={() => { setSaveOpen(false); setSavedSetId(null); }}>
-                    Close
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Title in your library
-                  </label>
-                  <Input
-                    autoFocus
-                    value={saveTitle}
-                    onChange={(e) => setSaveTitle(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && !saveBusy && confirmSave()}
-                    maxLength={100}
-                    placeholder={set?.title || 'My copy'}
-                  />
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  {set?.cards?.length || 0} flashcard{(set?.cards?.length || 0) === 1 ? '' : 's'} will be copied.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <Button onClick={confirmSave} disabled={saveBusy || !saveTitle.trim()} variant="gradient" className="flex-1">
-                    {saveBusy ? <><Loader2 className="h-4 w-4 animate-spin" />Saving…</> : <><Save className="h-4 w-4" />Save to my sets</>}
-                  </Button>
-                  <Button variant="ghost" onClick={() => setSaveOpen(false)} disabled={saveBusy}>
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      </div>
+          </div>
+        )}
+      </main>
     </div>
   );
 }

@@ -113,14 +113,19 @@ export default function Layout() {
         ))}
       </nav>
 
-      <div className={cn('border-t p-2 space-y-1', compact && 'flex flex-col items-center')}>
-        <div className={cn('flex items-center gap-1 px-1', compact && 'flex-col')}>
-          {!compact && (
-            <div className="flex-1 min-w-0 px-2">
-              <p className="truncate text-sm font-medium">{user?.name || 'Student'}</p>
-              <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
-            </div>
-          )}
+      {/* Fixed Footer Layout */}
+      <div className={cn('border-t p-3', compact ? 'flex flex-col items-center space-y-2' : 'space-y-2')}>
+        
+        {/* User Info on its own row */}
+        {!compact && (
+          <div className="min-w-0 px-1">
+            <p className="truncate text-sm font-semibold leading-tight">{user?.name || 'Student'}</p>
+            <p className="truncate text-[11px] text-muted-foreground mt-0.5">{user?.email}</p>
+          </div>
+        )}
+
+        {/* Buttons on a separate row below */}
+        <div className={cn('flex items-center gap-1', compact ? 'flex-col' : 'justify-between px-1')}>
           <MusicToggleButton />
           <Button variant="ghost" size="icon" onClick={toggleDark} aria-label="Toggle dark mode" title={isDark ? 'Light mode' : 'Dark mode'}>
             {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
